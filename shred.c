@@ -220,14 +220,11 @@ getblocks(struct shred_opts *opts, size_t len)
 {
   struct rlimit rl;
 
+  /* 1 byte at a time */
   opts->blocks    = len;
   opts->block_len = 1;
 
-  /*
-   * safe mode = 1 byte at a time r+w
-   * otherwise divide the size of the file into blocks, based on how much
-   * memory we have available to use
-   */
+
   if (!opts->safe) {
     if (getrlimit(RLIMIT_DATA, &rl) < 0) {
       opts->safe = 1;
@@ -248,9 +245,18 @@ getblocks(struct shred_opts *opts, size_t len)
        *
        * the length of each block is the total length of the file / the amount
        * of blocks we have
+       *
+       * if the block length is <= 0 then the file is probably small enough to
+       * be allocated as 1 block. PROBABLY, i would need an external opinion
        */
       opts->blocks    = (rl.rlim_cur / len) + 1;
       opts->block_len = len / opts->blocks;
+
+      /* file is small enough to allocate all at once */
+      if (opts->block_len <= 0) {
+        opts->blocks    = 1;
+        opts->block_len = len;
+      }
     }
   }
 
